@@ -3,14 +3,14 @@
 module spi(
     input wire clk,
     input wire reset,
-    input wire [15:0] data_in, //Input data
+    input wire [15:0] data_in, //Input data bit stream
     output wire spi_cs_L, //chip select (selecting the slave)
     output wire spi_sclk, //Serial CLK, these are wires
     output wire spi_data, //MOSI line, these are wires
     output wire [4:0]counter
 );
 
-reg [15:0]MOSI; //SPI shift register
+reg [15:0]MOSI; //SPI shift register. Register which the value is stored
 reg [4:0]count; //control counter
 reg cs_l; //SPI chip select (active low)
 reg sclk;
@@ -26,27 +26,28 @@ always @(posedge clk or posedge reset) begin
         count <= 5'd16;
         cs_l <= 1'b1;
         sclk <= 1'b0;
+        state <= S0;
     end
 
     else begin
         case (state)
             S0: begin
                 sclk <= 1'b0;
-                cs_l <= 1'b1;
+                cs_l <= 1'b1; 
                 state <= S1;
             end
 
             S1: begin
                 sclk <= 1'b0;
-                cs_l <= 1'b0;
-                MOSI <= datain[count - 1];
+                cs_l <= 1'b0; //Starts sending since cs becomes 0
+                MOSI <= data_in[count - 1]; //Bit is sent to MOSI, which was in the input bit stream
                 count <= count - 1;
                 state <= S2;
             end
 
             S2: begin
                 sclk <= 1'b1;
-                if(count > 0) state <= 1;
+                if(count > 0) state <= S1;
                 else begin
                     count <= 16;
                     state <= 0;
