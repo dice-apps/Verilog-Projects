@@ -1,90 +1,155 @@
 `timescale 1ns/1ps
 
 module automatic_washing_machine(
-    input wire clk, 
+    input wire clk,
     input wire reset,
-    input wire door_close,
     input wire start,
+    input wire door_close,
     input wire filled,
     input wire detergent_added,
-    input wire cycle_timeout,
-    input wire drained,
-    input wire spin_timeout,
+    input wire wash_done,
+    input wire drained_1,
+    input wire rinse_filled,
+    input wire drained_2,
+    input spin_done,
 
-    output reg door_lock,
-    output reg motor_on,
     output reg fill_valve_on,
+    output reg detergent_valve_on,
+    output reg motor_on,
     output reg drain_valve_on,
-    output reg done,
-    output reg soap_wash,
-    output reg water_wash
+    output reg spin_motor_on,
+    output reg door_lock,
+    output reg done
+
 );
 
-//Defining states
-parameter S0 = 3'b000; //Check Door
-parameter S1 = 3'b001; //Fill water
-parameter S2 = 3'b010; //Add detergent
-parameter S3 = 3'b011; //Cycle
-parameter S4 = 3'b100; //Drain
-parameter S5 = 3'b101; //Spin
+//defining states
 
-//Defining state variables
-reg [2:0] current_state;
-reg [2:0] next_state;
+parameter S0 = 4'd0;//Idle
+parameter S1 = 4'd1;//Fill water
+parameter S2 = 4'd2;//Add detergent
+parameter S3 = 4'd3;//Wash
+parameter S4 = 4'd4;//Drain_water_1
+parameter S5 = 4'd5;//Rinse
+parameter S6 = 4'd6;//Drain water 2
+parameter S7 = 4'd7;//Spin
+parameter S8 = 4'd8;//Done
 
-//defining state logic
+reg [3:0]current_state;
+reg [3:0]next_state;
+
+//defining state register
 always @(posedge clk or posedge reset) begin
-    if(reset) begin 
+    if(reset) begin
         current_state <= S0;
     end
     
-    else begin
-        case (current_state)
-            S0: begin
-                if(start && door_close) next_state <= S1;
-                else next_state <= S0;
-            end
-
-            S1: begin
-                if(~filled) next_state <= S1;
-                else if (filled) next_state <= S2;
-            end
-
-            S2: begin
-                if(detergent_added) next_state <= S2;
-                else if(~detergent_added) next_state <= S3;
-            end
-
-            S3: begin
-                if(~cycle_timeout) next_state <= S3;
-                else if(cycle_timeout) next_state <= S4;
-            end
-
-            S4: begin
-                if(~drained) next_state <= S4;
-                else if(drained) next_state <= S5;
-            end
-
-            S5: begin
-                if(~spin_timeout) next_state <= S5;
-                else if(spin_timeout) next_state <= S0;
-            end
-            default: next_state <= S0;
-        endcase
-
-        current_state <= next_state;
-    end
+    else current_state <= next_state; //current state will  be the next state
 end
 
-
-//defining output logic
-always @(current_state) begin
+//defining state transitions
+always @(*) begin
     case (current_state)
         S0: begin
-            
-        end 
-        default: 
+            if(start && door_close) next_state <= S1;
+            else next_state <= S0;
+        end
+
+        S1: begin
+            if(filled) next_state <= S2;
+            else next_state <= S1;
+        end
+
+        S2: begin
+          next_state <= detergent_added ? S3 : S2;
+        end
+
+        S3: begin
+          next_state <= wash_done ? S4 : S3;
+        end
+
+        S4: begin
+          next_state <= drained_1 ? S5 : S4;
+        end
+
+        S5: begin
+          next_state <= rinse_filled ? S6 : S5;
+        end
+
+        S6: begin
+          next_state <= drained_2 ? S7 : S6;
+        end
+
+        S7: begin
+          next_state <= spin_done ? S8 : S7;
+        end
+
+        S8: begin
+          next_state <= S0;
+        end
+
+        default: next_state <= S0;
     endcase
 end
 
+//defining output logic => Moore machine(output depends only on current state)
+always @(*) begin
+
+    //setting output values to 0, by default
+    fill_valve_on = 0;
+    detergent_valve_on = 0;
+    motor_on = 0;
+    drain_valve_on = 0;
+    fill_valve_on = 0;
+    spin_motor_on = 0;
+    door_lock = 0;
+    done = 0;
+
+    case (current_state)
+        S0: begin
+          door_lock <= 0;
+        end
+
+        S1: begin
+          fill_valve_on <= 1;
+          door_lock <= 1;
+        end
+
+        S2: begin
+          detergent_valve_on <= 1;
+          door_lock <= 1;
+        end
+
+        S3: begin
+          motor_on <= 1;
+          door_lock <= 1;
+        end
+
+        S4: begin
+          drain_valve_on <= 1;
+          door_lock <= 1;
+        end
+
+        S5: begin
+          fill_valve_on <= 1;
+          door_lock <= 1;
+        end
+
+        S6: begin
+          drain_valve_on <= 1;
+          door_lock <= 1;
+        end
+
+        S7: begin
+          spin_motor_on <= 1;
+          door_lock <= 1;
+        end
+
+        S8: begin
+          done <= 1;
+          door_lock <= 1;
+        end
+    endcase
+
+end
 endmodule
